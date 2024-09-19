@@ -1,8 +1,16 @@
 package main
 
-import "fmt"
+import (
+	"go-distrbuted-storage/p2p"
+	"log"
+
+)
 
 
 func main() {
-	fmt.Println("I will made it!")
+	tr := p2p.NewTCPTransport(":8080");
+	if err := tr.ListenAndAccept(); err != nil{
+		log.Fatal(err)
+	}
+	// select{}
 }
