@@ -8,4 +8,6 @@ type Peer interface{}
 
 // Transport represents the communication layer used by peers to exchange data.
 // It can be implemented using various protocols such as TCP, UDP, etc.
-type Transport interface{}
+type Transport interface{
+	ListenAndAccept() error
+}

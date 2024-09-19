@@ -6,6 +6,9 @@ import (
 	"sync"
 )
 
+// TCPTransport represents a transport mechanism using TCP for peer-to-peer communication.
+// It includes the listening address, the network listener, and a map of peers with their respective addresses.
+// The structure is protected by a read-write mutex to ensure thread-safe access.
 type TCPTransport struct {
 	listenAddress string
 	listener	net.Listener
