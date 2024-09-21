@@ -24,26 +24,38 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	}
 }
 
+// TCPTransportOPT holds the configuration options for the TCP transport layer.
+// It includes the address to listen on and a function for handling handshakes.
+//
+// Fields:
+// - ListenAddress: The address on which the TCP transport will listen for incoming connections.
+// - HandshakeFunc: A function that defines the handshake process for establishing connections.
+type TCPTransportOPT struct{
+	ListenAddress string
+	HandshakeFunc HandshakeFunc
+	Decoder Decoder
+}
+
 // TCPTransport represents a transport mechanism using TCP for peer-to-peer communication.
-// It includes the listening address, the network listener, and a map of peers with their respective addresses.
-// The structure is protected by a read-write mutex to ensure thread-safe access.
+// It holds the configuration options, a network listener, and a map of connected peers.
+// The structure is thread-safe, utilizing a read-write mutex for concurrent access.
 type TCPTransport struct {
-	listenAddress string
+	tcpTransportOPT TCPTransportOPT
 	listener      net.Listener
 
 	mu    sync.RWMutex
 	peers map[net.Addr]Peer
 }
 
-func NewTCPTransport(listenAddr string) *TCPTransport {
+func NewTCPTransport(tcpTransportOPT TCPTransportOPT) *TCPTransport {
 	return &TCPTransport{
-		listenAddress: listenAddr,
+		tcpTransportOPT: tcpTransportOPT,
 	}
 }
 
 func (t *TCPTransport)ListenAndAccept() error {
 	var err error
-	t.listener, err = net.Listen("tcp", t.listenAddress)
+	t.listener, err = net.Listen("tcp", t.tcpTransportOPT.ListenAddress)
 
 	if err != nil {
 		return err
@@ -62,11 +74,33 @@ func (t *TCPTransport) startAcceptLoop() {
 			fmt.Printf("TCP accept error: %s\n", err)
 			continue
 		}
+		fmt.Printf("new incoming connection %+v\n", conn)
+
 		go t.handleConn(conn)
 	}
 }
 
-func (t *TCPTransport) handleConn(conn net.Conn) {
+// handleConn handles an incoming TCP connection. It performs a handshake
+// with the peer and then continuously decodes incoming messages from the connection.
+// If an error occurs during the handshake, the connection is closed and an error message is printed.
+// If an error occurs while decoding a message, an error message is printed and the loop continues.
+func (t *TCPTransport) handleConn(conn net.Conn){
 	peer := NewTCPPeer(conn, true)
-	fmt.Printf("new incoming connection %+v\n", peer)
+
+		
+	if err := t.tcpTransportOPT.HandshakeFunc(peer); err != nil {
+		conn.Close()
+		fmt.Printf("TCP handshake error %s\n", err)
+		return
+	}
+
+	message := &Message{}
+	for{
+		if err := t.tcpTransportOPT.Decoder.Decode(conn, message); err != nil{
+			fmt.Println("TCP receiving message error")
+			continue
+		}
+
+		fmt.Printf("new message received %s\n", message.Payload)
+	}	
 }
