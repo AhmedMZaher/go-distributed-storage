@@ -101,6 +101,7 @@ func (t *TCPTransport) handleConn(conn net.Conn){
 			continue
 		}
 
-		fmt.Printf("new message received %s\n", message.Payload)
+		message.From = conn.RemoteAddr();
+		fmt.Printf("new message received %+v\n", message)
 	}	
 }
