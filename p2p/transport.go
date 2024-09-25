@@ -4,7 +4,9 @@
 package p2p
 
 // Peer represents a node in the network.
-type Peer interface{}
+type Peer interface{
+	Close() error
+}
 
 // Transport represents the communication layer used by peers to exchange data.
 // It can be implemented using various protocols such as TCP, UDP, etc.

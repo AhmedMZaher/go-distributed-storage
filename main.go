@@ -6,12 +6,17 @@ import (
 	"log"
 )
 
+func OnPeer(peer p2p.Peer) error{
+	return peer.Close()
+}
 
 func main() {
 	tcptransportOPT := p2p.TCPTransportOPT{
 		ListenAddress : ":3030",
 		HandshakeFunc: p2p.NOPHandshakeFunc,
 		Decoder: p2p.DefaultDecoder{},
+		OnPeer: OnPeer,
+		
 	}
 	tr := p2p.NewTCPTransport(tcptransportOPT);
 

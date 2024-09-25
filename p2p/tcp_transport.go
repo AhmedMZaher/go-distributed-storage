@@ -23,6 +23,12 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	}
 }
 
+// Close terminates the TCP connection associated with the TCPPeer.
+// It returns an error if the connection closure fails.
+func (p *TCPPeer)Close() error{
+	return p.conn.Close()
+}
+
 // TCPTransportOPT holds the configuration options for the TCP transport layer.
 // It includes the address to listen on and a function for handling handshakes.
 //
@@ -33,6 +39,7 @@ type TCPTransportOPT struct{
 	ListenAddress string
 	HandshakeFunc HandshakeFunc
 	Decoder Decoder
+	OnPeer func(Peer) error
 }
 
 
@@ -45,7 +52,6 @@ type TCPTransport struct {
 	tcpTransportOPT TCPTransportOPT
 	listener      net.Listener
 	rpcCh	chan RPC
-	OnPeer func(Peer) error
 }
 
 func NewTCPTransport(tcpTransportOPT TCPTransportOPT) *TCPTransport {
@@ -108,8 +114,8 @@ func (t *TCPTransport) handleConn(conn net.Conn){
 		return
 	}
 
-	if t.OnPeer != nil{
-		if err = t.OnPeer(peer); err != nil{
+	if t.tcpTransportOPT.OnPeer != nil{
+		if err = t.tcpTransportOPT.OnPeer(peer); err != nil{
 			return
 		}
 	}
@@ -117,9 +123,9 @@ func (t *TCPTransport) handleConn(conn net.Conn){
 
 	rpc := RPC{}
 	for{
-		if err := t.tcpTransportOPT.Decoder.Decode(conn, &rpc); err != nil{
-			fmt.Println("TCP receiving message error")
-			continue
+		err = t.tcpTransportOPT.Decoder.Decode(conn, &rpc)
+		if err != nil{
+			return
 		}
 
 		rpc.From = conn.RemoteAddr();
