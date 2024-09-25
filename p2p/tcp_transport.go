@@ -94,7 +94,7 @@ func (t *TCPTransport) handleConn(conn net.Conn){
 		return
 	}
 
-	message := &Message{}
+	message := &RPC{}
 	for{
 		if err := t.tcpTransportOPT.Decoder.Decode(conn, message); err != nil{
 			fmt.Println("TCP receiving message error")
