@@ -10,4 +10,5 @@ type Peer interface{}
 // It can be implemented using various protocols such as TCP, UDP, etc.
 type Transport interface{
 	ListenAndAccept() error
+	Consume() <-chan RPC
 }
