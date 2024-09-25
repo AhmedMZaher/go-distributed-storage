@@ -1,7 +1,7 @@
 package main
 
 import (
-	"go-distrbuted-storage/p2p"
+	"go-distributed-storage/p2p"
 	"log"
 
 )
