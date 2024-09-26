@@ -84,6 +84,10 @@ func NewStorage(storeOPT StoreOPT) *Storage {
 	}
 }
 
+func (s *Storage) Clear() error {
+	return os.RemoveAll(s.Config.RootDir)
+}
+
 func (s *Storage) prependTheRoot(path string) string {
 	return fmt.Sprintf("%s/%s", s.Config.RootDir, path)
 }
@@ -103,7 +107,8 @@ func (s *Storage) DeleteFile(fileName string) error {
 		log.Printf("Deleted file or directory: %s", fileIdentifier.firstPathSegment())
 	}()
 
-	return os.RemoveAll(fileIdentifier.firstPathSegment())
+	firstPathSegmentWithRoot := s.prependTheRoot(fileIdentifier.firstPathSegment())
+	return os.RemoveAll(firstPathSegmentWithRoot)
 }
 
 // ReadFile reads the contents of a specified file and returns an io.Reader.

@@ -6,27 +6,12 @@ import (
 	"testing"
 )
 
-func TestDelete(t *testing.T) {
-	opts :=  StoreOPT{
-		PathTranformFunc: HashPathBuilder,
-	}
-	storage := NewStorage(opts)
-
-	fileName := "my picture1"
-	data := []byte("Hello! How are you ?")
-
-	if err := storage.StoreFile(fileName, bytes.NewBuffer(data)); err != nil {
-		t.Error(err)
-	}
-	if err := storage.DeleteFile(fileName); err != nil {
-		t.Error(err)
-	}
-}
 func TestStore(t *testing.T) {
 	opts :=  StoreOPT{
 		PathTranformFunc: HashPathBuilder,
 	}
 	storage := NewStorage(opts)
+	cleanup(t, storage)
 
 	fileName := "my picture1"
 	data := []byte("Hello! How are you ?")
@@ -44,6 +29,14 @@ func TestStore(t *testing.T) {
 	if string(b) != string(data) {
 		t.Error("Wrong data Mismatch!")
 	}
+	
+	if err := storage.DeleteFile(fileName); err != nil {
+		t.Error(err)
+	}
+}
 
-
+func cleanup(t *testing.T, s *Storage) {
+	if err := s.Clear(); err != nil {
+		t.Error(err)
+	}
 }
