@@ -45,6 +45,18 @@ type FileIdentifier struct {
 	FileName string
 }
 
+func (FileIdentifier *FileIdentifier) firstPathSegment() string {
+	pathSegments := strings.Split(FileIdentifier.PathName, "/")
+	if len(pathSegments) == 0 {
+		return ""
+	}
+	return pathSegments[0]
+}
+
+func (fileIdentifier *FileIdentifier) BuildFilePath() string {
+	return fmt.Sprintf("%s/%s", fileIdentifier.PathName, fileIdentifier.FileName)
+}
+
 type StoreOPT struct {
 	PathTranformFunc func(string) FileIdentifier
 }
@@ -62,14 +74,6 @@ func NewStorage(storeOPT StoreOPT) *Storage {
 	}
 }
 
-func (FileIdentifier *FileIdentifier) firstPathSegment() string {
-	pathSegments := strings.Split(FileIdentifier.PathName, "/")
-	if len(pathSegments) == 0 {
-		return ""
-	}
-	return pathSegments[0]
-}
-
 func (s *Storage) DeleteFile(fileName string) error {
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
 
@@ -78,9 +82,6 @@ func (s *Storage) DeleteFile(fileName string) error {
 	}()
 
 	return os.RemoveAll(fileIdentifier.firstPathSegment())
-}
-func (fileIdentifier *FileIdentifier) BuildFilePath() string {
-	return fmt.Sprintf("%s/%s", fileIdentifier.PathName, fileIdentifier.FileName)
 }
 
 // ReadFile reads the contents of a specified file and returns an io.Reader.
