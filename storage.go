@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -72,6 +73,14 @@ func NewStorage(storeOPT StoreOPT) *Storage {
 	return &Storage{
 		Config: storeOPT,
 	}
+}
+
+// HasKey checks if a file with the given name exists in the storage.
+func (s *Storage) HasKey(fileName string) bool {
+	fileIdentifier := s.Config.PathTranformFunc(fileName)
+
+	_, err := os.Stat(fileIdentifier.BuildFilePath())
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func (s *Storage) DeleteFile(fileName string) error {
