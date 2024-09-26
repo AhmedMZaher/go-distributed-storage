@@ -95,8 +95,9 @@ func (s *Storage) prependTheRoot(path string) string {
 // HasKey checks if a file with the given name exists in the storage.
 func (s *Storage) HasKey(fileName string) bool {
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
+	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
 
-	_, err := os.Stat(fileIdentifier.BuildFilePath())
+	_, err := os.Stat(fullPathWithRoot)
 	return !errors.Is(err, os.ErrNotExist)
 }
 
