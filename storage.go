@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -51,8 +52,34 @@ func NewStorage(storeOPT StoreOPT) *Storage {
 	}
 }
 
-func BuildFilePath(fileIdentifier FileIdentifier) string {
+func (fileIdentifier *FileIdentifier) BuildFilePath() string {
 	return fmt.Sprintf("%s/%s", fileIdentifier.PathName, fileIdentifier.FileName)
+}
+// ReadFile reads the contents of a specified file and returns an io.Reader.
+// It uses a buffer to temporarily store the file data in memory rather than writing 
+// directly to a file. This approach avoids issues related to file locking and 
+// access contention, as the file can be closed immediately after reading.
+// Storing data in a buffer allows for efficient access without the need to 
+// maintain file handles open longer than necessary, which reduces the risk 
+// of file access conflicts in concurrent environments.
+func (s *Storage) ReadFile(fileName string) (io.Reader, error){
+	f, err := s.ReadIntoFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	defer f.Close()
+
+	buf := new(bytes.Buffer)
+
+	_, err = io.Copy(buf, f)
+	return buf, err
+}
+
+func (s *Storage) ReadIntoFile(fileName string) (io.ReadCloser, error){
+	fileIdentifier := s.Config.PathTranformFunc(fileName)
+	fullPath := fileIdentifier.BuildFilePath()
+	return os.Open(fullPath)
 }
 
 // StoreFile reads from the input stream and writes the data to a file.
@@ -64,9 +91,9 @@ func (s *Storage) StoreFile(fileName string, inputStream io.Reader) error{
 		return err
 	}
 
-	pathAndFileName := BuildFilePath(fileIdentifier)
+	fullPath := fileIdentifier.BuildFilePath()
 
-	destinationFile, err := os.Create(pathAndFileName)
+	destinationFile, err := os.Create(fullPath)
 	if err != nil {
 		return err
 	}
@@ -76,7 +103,7 @@ func (s *Storage) StoreFile(fileName string, inputStream io.Reader) error{
 		return err
 	}
 
-	log.Printf("%d bytes written to %s", n, pathAndFileName)
+	log.Printf("%d bytes written to %s", n, fullPath)
 
 	return nil
 }

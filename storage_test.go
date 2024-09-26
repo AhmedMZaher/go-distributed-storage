@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"testing"
 )
 
@@ -11,9 +12,20 @@ func TestStore(t *testing.T) {
 	}
 	storage := NewStorage(opts)
 
-	data := bytes.NewBuffer([]byte("Hello! How are you ?"))
+	fileName := "my picture1"
+	data := []byte("Hello! How are you ?")
 
-	if err := storage.StoreFile("my picture", data); err != nil {
+	if err := storage.StoreFile(fileName, bytes.NewBuffer(data)); err != nil {
 		t.Error(err)
+	}
+
+	r, err := storage.ReadFile(fileName)
+	if err != nil {
+		t.Error(err)
+	}
+
+	b, _ := io.ReadAll(r)
+	if string(b) != string(data) {
+		t.Error("Wrong data Mismatch!")
 	}
 }
