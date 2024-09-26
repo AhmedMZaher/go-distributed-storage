@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+// DefaultRootFolderName represents the default name for the root folder
+// where data will be stored in the distributed storage system.
+const DefaultRootFolderName = "data"
+
 // HashPathBuilder generates a FileIdentifier for a given file name.
 // It computes the SHA-1 hash of the file name, encodes it to a hexadecimal string,
 // and splits the hash into segments to create a directory path.
@@ -60,6 +64,7 @@ func (fileIdentifier *FileIdentifier) BuildFilePath() string {
 
 type StoreOPT struct {
 	PathTranformFunc func(string) FileIdentifier
+	RootDir			string
 }
 
 type Storage struct {
@@ -70,9 +75,17 @@ func NewStorage(storeOPT StoreOPT) *Storage {
 	if storeOPT.PathTranformFunc == nil {
 		storeOPT.PathTranformFunc = DefaultPathBuilder
 	}
+	if storeOPT.RootDir == "" {
+		storeOPT.RootDir = DefaultRootFolderName
+	}
+
 	return &Storage{
 		Config: storeOPT,
 	}
+}
+
+func (s *Storage) prependTheRoot(path string) string {
+	return fmt.Sprintf("%s/%s", s.Config.RootDir, path)
 }
 
 // HasKey checks if a file with the given name exists in the storage.
@@ -116,8 +129,8 @@ func (s *Storage) ReadFile(fileName string) (io.Reader, error) {
 
 func (s *Storage) ReadIntoFile(fileName string) (io.ReadCloser, error) {
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
-	fullPath := fileIdentifier.BuildFilePath()
-	return os.Open(fullPath)
+	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
+	return os.Open(fullPathWithRoot)
 }
 
 // StoreFile reads from the input stream and writes the data to a file.
@@ -125,13 +138,14 @@ func (s *Storage) ReadIntoFile(fileName string) (io.ReadCloser, error) {
 // It creates necessary directories if they don't exist.
 func (s *Storage) StoreFile(fileName string, inputStream io.Reader) error {
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
-	if err := os.MkdirAll(fileIdentifier.PathName, os.ModePerm); err != nil {
+	pathNameWithRoot := s.prependTheRoot(fileIdentifier.PathName)
+	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
 		return err
 	}
 
-	fullPath := fileIdentifier.BuildFilePath()
+	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
 
-	destinationFile, err := os.Create(fullPath)
+	destinationFile, err := os.Create(fullPathWithRoot)
 	if err != nil {
 		return err
 	}
@@ -141,7 +155,7 @@ func (s *Storage) StoreFile(fileName string, inputStream io.Reader) error {
 		return err
 	}
 
-	log.Printf("%d bytes written to %s", n, fullPath)
+	log.Printf("%d bytes written to %s", n, fullPathWithRoot)
 
 	// Ensure the file is closed after writing
 	return destinationFile.Close()
