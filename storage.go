@@ -33,6 +33,12 @@ func HashPathBuilder(fileName string) FileIdentifier {
 	}
 }
 
+func DefaultPathBuilder (fileName string) FileIdentifier {
+	return FileIdentifier{
+		PathName: fileName,
+		FileName: fileName,
+	}
+}
 type FileIdentifier struct {
 	PathName string
 	FileName string
@@ -47,6 +53,9 @@ type Storage struct {
 }
 
 func NewStorage(storeOPT StoreOPT) *Storage {
+	if storeOPT.PathTranformFunc == nil {
+		storeOPT.PathTranformFunc = DefaultPathBuilder
+	}
 	return &Storage{
 		Config: storeOPT,
 	}
