@@ -8,32 +8,32 @@ import (
 )
 
 type FileServerOPT struct {
-	RootDir         string
-	Transport       p2p.Transport
+	RootDir          string
+	Transport        p2p.Transport
 	PathTranformFunc PathTranformSignature
-	BootstrapNodes	[]string
+	BootstrapNodes   []string
 }
 
 type FileServer struct {
-	Config	FileServerOPT
+	Config FileServerOPT
 
 	peerLock sync.Mutex
-	peers map[string]p2p.Peer
+	peers    map[string]p2p.Peer
 
 	Storage Storage
-	quitCh	chan struct{}
+	quitCh  chan struct{}
 }
 
 func NewFileServer(opt FileServerOPT) *FileServer {
 	storageOPT := StoreOPT{
-		RootDir: opt.RootDir,
+		RootDir:          opt.RootDir,
 		PathTranformFunc: opt.PathTranformFunc,
 	}
 	return &FileServer{
-		Config: opt,
+		Config:  opt,
 		Storage: *NewStorage(storageOPT),
-		quitCh: make(chan struct{}),
-		peers: make(map[string]p2p.Peer),
+		quitCh:  make(chan struct{}),
+		peers:   make(map[string]p2p.Peer),
 	}
 }
 
@@ -42,14 +42,14 @@ func (s *FileServer) Stop() {
 }
 
 func (s *FileServer) loop() {
-	defer func ()  {
-		log.Println("FileServer has been closed")
+	defer func() {
+		log.Println("FileServer has shut down and transport connection has been closed.")
 		s.Config.Transport.Close()
 	}()
 
 	for {
-		select{
-		case rpc := <-s.Config.Transport.Consume() :
+		select {
+		case rpc := <-s.Config.Transport.Consume():
 			fmt.Println(rpc)
 		case <-s.quitCh:
 			return
@@ -68,14 +68,14 @@ func (s *FileServer) connectToBootstrapNodes() error {
 			continue
 		}
 
-		go func ()  {
-			fmt.Printf("Connecting to bootstrap node with address: %s\n", address)
+		go func() {
+			fmt.Printf("Attempting to connect to bootstrap node: %s\n", address)
 			if err := s.Config.Transport.Dial(address); err != nil {
-				log.Println("bootstrap node dial error:", err)
-			}	
+				log.Printf("Failed to connect to bootstrap node %s: %v\n", address, err)
+			}
 		}()
 	}
-	
+
 	return nil
 }
 
@@ -85,7 +85,7 @@ func (s *FileServer) Start() error {
 	}
 
 	s.connectToBootstrapNodes()
-	
+
 	s.loop()
 
 	return nil
