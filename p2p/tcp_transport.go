@@ -96,7 +96,7 @@ func (t *TCPTransport) ListenAndAccept() error {
 
 	go t.startAcceptLoop()
 
-	fmt.Printf("TCPTransport listening on address: %s\n", t.tcpTransportOPT.ListenAddress)
+	fmt.Printf("TCPTransport listening on address: %s\n", t.listener.Addr())
 	return nil
 }
 
@@ -108,7 +108,7 @@ func (t *TCPTransport) startAcceptLoop() {
 			fmt.Printf("TCP accept error: %s\n", err)
 			continue
 		}
-		fmt.Printf("Accepted new incoming connection from: %s\n", conn.RemoteAddr())
+		fmt.Printf("Accepted new incoming connection from: %s\n", conn.LocalAddr())
 
 		go t.handleConn(conn, false)
 	}
