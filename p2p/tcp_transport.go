@@ -66,6 +66,9 @@ func (t *TCPTransport) Close() error {
 	return t.listener.Close()
 }
 
+// Dial establishes a TCP connection to the specified address.
+// Once connected, it spawns a goroutine to handle the connection asynchronously.
+// Returns an error if the connection cannot be established.
 func (t *TCPTransport) Dial(address string) error {
 	conn, err := net.Dial("tcp", address)
 
@@ -93,7 +96,7 @@ func (t *TCPTransport) ListenAndAccept() error {
 
 	go t.startAcceptLoop()
 
-	fmt.Printf("Server is listening on port: %s\n", t.tcpTransportOPT.ListenAddress)
+	fmt.Printf("TCPTransport listening on address: %s\n", t.tcpTransportOPT.ListenAddress)
 	return nil
 }
 
@@ -105,7 +108,7 @@ func (t *TCPTransport) startAcceptLoop() {
 			fmt.Printf("TCP accept error: %s\n", err)
 			continue
 		}
-		fmt.Printf("new incoming connection %+v\n", conn)
+		fmt.Printf("Accepted new incoming connection from: %s\n", conn.RemoteAddr())
 
 		go t.handleConn(conn, false)
 	}
@@ -121,7 +124,7 @@ func (t *TCPTransport) startAcceptLoop() {
 func (t *TCPTransport) handleConn(conn net.Conn, outbound bool){
 	var err error
 	defer func(){
-		fmt.Printf("ERROR: dropping the peer connection %s", err)
+		fmt.Printf("Dropping peer connection due to error: %v\n", err)
 	}()
 
 	peer := NewTCPPeer(conn, outbound)
