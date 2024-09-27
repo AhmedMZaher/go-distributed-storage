@@ -61,6 +61,11 @@ func NewTCPTransport(tcpTransportOPT TCPTransportOPT) *TCPTransport {
 	}
 }
 
+// Implements the transport interface
+func (t *TCPTransport) Close() error {
+	return t.listener.Close()
+}
+
 // Consume returns a read-only channel of RPCs that the TCPTransport has received.
 // This channel can be used to process incoming RPCs in a non-blocking manner.
 func (t *TCPTransport) Consume() <-chan RPC{
@@ -77,6 +82,7 @@ func (t *TCPTransport) ListenAndAccept() error {
 
 	go t.startAcceptLoop()
 
+	fmt.Printf("Server is listening on port: %s\n", t.tcpTransportOPT.ListenAddress)
 	return nil
 }
 

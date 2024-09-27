@@ -62,8 +62,9 @@ func (fileIdentifier *FileIdentifier) BuildFilePath() string {
 	return fmt.Sprintf("%s/%s", fileIdentifier.PathName, fileIdentifier.FileName)
 }
 
+type PathTranformSignature func(string) FileIdentifier
 type StoreOPT struct {
-	PathTranformFunc func(string) FileIdentifier
+	PathTranformFunc PathTranformSignature
 	RootDir			string
 }
 
