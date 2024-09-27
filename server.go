@@ -11,6 +11,7 @@ type FileServerOPT struct {
 	RootDir         string
 	Transport       p2p.Transport
 	PathTranformFunc PathTranformSignature
+	BootstrapNodes	[]string
 }
 
 type FileServer struct {
@@ -56,11 +57,35 @@ func (s *FileServer) loop() {
 	}
 }
 
+// connectToBootstrapNodes attempts to connect to all bootstrap nodes specified in the server's configuration.
+// It iterates over the list of bootstrap node addresses and spawns a goroutine for each non-empty address to
+// establish a connection using the server's transport mechanism. If a connection attempt fails, an error is logged.
+//
+// Returns an error if any issues occur during the connection process.
+func (s *FileServer) connectToBootstrapNodes() error {
+	for _, address := range s.Config.BootstrapNodes {
+		if len(address) == 0 {
+			continue
+		}
+
+		go func ()  {
+			fmt.Printf("Connecting to bootstrap node with address: %s\n", address)
+			if err := s.Config.Transport.Dial(address); err != nil {
+				log.Println("bootstrap node dial error:", err)
+			}	
+		}()
+	}
+	
+	return nil
+}
+
 func (s *FileServer) Start() error {
 	if err := s.Config.Transport.ListenAndAccept(); err != nil {
 		return err
 	}
 
+	s.connectToBootstrapNodes()
+	
 	s.loop()
 
 	return nil
