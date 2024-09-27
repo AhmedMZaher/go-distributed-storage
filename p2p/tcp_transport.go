@@ -66,6 +66,17 @@ func (t *TCPTransport) Close() error {
 	return t.listener.Close()
 }
 
+func (t *TCPTransport) Dial(address string) error {
+	conn, err := net.Dial("tcp", address)
+
+	if err != nil {
+		return err
+	}
+
+	go t.handleConn(conn, true)
+
+	return nil
+}
 // Consume returns a read-only channel of RPCs that the TCPTransport has received.
 // This channel can be used to process incoming RPCs in a non-blocking manner.
 func (t *TCPTransport) Consume() <-chan RPC{
@@ -96,7 +107,7 @@ func (t *TCPTransport) startAcceptLoop() {
 		}
 		fmt.Printf("new incoming connection %+v\n", conn)
 
-		go t.handleConn(conn)
+		go t.handleConn(conn, false)
 	}
 }
 
@@ -107,13 +118,13 @@ func (t *TCPTransport) startAcceptLoop() {
 //
 // The function will log an error message and drop the connection if any error
 // occurs during the handshake or while decoding messages.
-func (t *TCPTransport) handleConn(conn net.Conn){
+func (t *TCPTransport) handleConn(conn net.Conn, outbound bool){
 	var err error
 	defer func(){
 		fmt.Printf("ERROR: dropping the peer connection %s", err)
 	}()
 
-	peer := NewTCPPeer(conn, true)
+	peer := NewTCPPeer(conn, outbound)
 
 		
 	if err = t.tcpTransportOPT.HandshakeFunc(peer); err != nil {
