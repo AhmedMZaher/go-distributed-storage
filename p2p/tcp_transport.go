@@ -11,30 +11,23 @@ type TCPPeer struct {
 
 	// conn represents a network connection that implements the net.Conn interface.
 	// It is used for reading and writing data over a TCP connection.
-	conn net.Conn
+	net.Conn
 	// outbound indicates whether the connection is outbound (true) or inbound (false).
 	outbound bool
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
-		conn:     conn,
+		Conn:     conn,
 		outbound: outbound,
 	}
 }
 
-// Close terminates the TCP connection associated with the TCPPeer.
-// It returns an error if the connection closure fails.
-func (p *TCPPeer)Close() error{
-	return p.conn.Close()
-}
 
-// RemoteAddr returns the remote network address of the TCPPeer.
-// It implements the net.Addr interface.
-func (p *TCPPeer) RemoteAddr() net.Addr {
-    return p.conn.RemoteAddr()
+func (p *TCPPeer) Send(bytes []byte) error {
+	_, err := p.Conn.Write(bytes)
+	return err
 }
-
 // TCPTransportOPT holds the configuration options for the TCP transport layer.
 // It includes the address to listen on and a function for handling handshakes.
 //

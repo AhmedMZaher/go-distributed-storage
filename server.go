@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
 	"go-distributed-storage/p2p"
+	"io"
 	"log"
 	"sync"
 )
@@ -37,6 +39,20 @@ func NewFileServer(opt FileServerOPT) *FileServer {
 	}
 }
 
+type Payload struct{
+	Key 	string
+	Data 	[]byte
+}
+
+func (s *FileServer) broadcast(payload Payload) error {
+	peers := []io.Writer{}
+	for _, peer := range s.peers {
+		peers = append(peers, peer)
+	}
+
+	mw := io.MultiWriter(peers...)
+	return gob.NewEncoder(mw).Encode(payload)
+}
 func (s *FileServer) Stop() {
 	close(s.quitCh)
 }
@@ -47,7 +63,7 @@ func (s *FileServer) OnPeer(p p2p.Peer) error {
 
 	s.peers[p.RemoteAddr().String()] = p
 
-	log.Printf("%s accepted peer connection from: %s\n", s.Config.Transport.RemoteAddr().Addr().String(), p.RemoteAddr())
+	log.Printf("%s accepted peer connection from: %s\n", p.LocalAddr(), p.RemoteAddr())
 
 	return nil
 }
