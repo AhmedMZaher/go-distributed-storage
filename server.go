@@ -41,6 +41,16 @@ func (s *FileServer) Stop() {
 	close(s.quitCh)
 }
 
+func (s *FileServer) OnPeer(p p2p.Peer) error {
+	s.peerLock.Lock()
+	defer s.peerLock.Unlock()
+
+	s.peers[p.RemoteAddr().String()] = p
+
+	log.Printf("%s accepted peer connection from: %s\n", s.Config.Transport.RemoteAddr().Addr().String(), p.RemoteAddr())
+
+	return nil
+}
 func (s *FileServer) loop() {
 	defer func() {
 		log.Println("FileServer has shut down and transport connection has been closed.")
@@ -69,7 +79,7 @@ func (s *FileServer) connectToBootstrapNodes() error {
 		}
 
 		go func() {
-			fmt.Printf("Attempting to connect to bootstrap node: %s\n", address)
+			fmt.Printf("%s Attempting to connect to bootstrap node: %s\n", s.Config.Transport.RemoteAddr().Addr().String(), address)
 			if err := s.Config.Transport.Dial(address); err != nil {
 				log.Printf("Failed to connect to bootstrap node %s: %v\n", address, err)
 			}

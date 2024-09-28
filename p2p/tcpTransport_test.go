@@ -6,7 +6,7 @@ import (
 )
 
 func TestTCPTransport(t *testing.T) {
-	tcptransportOPT := TCPTransportOPT{
+	tcptransportOPT := &TCPTransportOPT{
 		ListenAddress : ":3030",
 		HandshakeFunc: NOPHandshakeFunc,
 		Decoder: DefaultDecoder{},

@@ -7,7 +7,7 @@ import (
 )
 
 func makeServer(listenAddress string, nodes ...string) *FileServer {
-	tcptransportOpts := p2p.TCPTransportOPT{
+	tcptransportOpts := &p2p.TCPTransportOPT{
 		ListenAddress: listenAddress,
 		HandshakeFunc: p2p.NOPHandshakeFunc,
 		Decoder:       p2p.DefaultDecoder{},
@@ -22,6 +22,8 @@ func makeServer(listenAddress string, nodes ...string) *FileServer {
 	}
 
 	server := NewFileServer(fileServerOpts)
+	
+	tcptransportOpts.OnPeer = server.OnPeer
 
 	return server
 }

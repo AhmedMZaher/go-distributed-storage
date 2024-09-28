@@ -29,6 +29,12 @@ func (p *TCPPeer)Close() error{
 	return p.conn.Close()
 }
 
+// RemoteAddr returns the remote network address of the TCPPeer.
+// It implements the net.Addr interface.
+func (p *TCPPeer) RemoteAddr() net.Addr {
+    return p.conn.RemoteAddr()
+}
+
 // TCPTransportOPT holds the configuration options for the TCP transport layer.
 // It includes the address to listen on and a function for handling handshakes.
 //
@@ -49,12 +55,12 @@ type TCPTransportOPT struct{
 // and a callback function to make the code more generic
 // that is triggered when a new peer is connected.
 type TCPTransport struct {
-	tcpTransportOPT TCPTransportOPT
+	tcpTransportOPT *TCPTransportOPT
 	listener      net.Listener
 	rpcCh	chan RPC
 }
 
-func NewTCPTransport(tcpTransportOPT TCPTransportOPT) *TCPTransport {
+func NewTCPTransport(tcpTransportOPT *TCPTransportOPT) *TCPTransport {
 	return &TCPTransport{
 		tcpTransportOPT: tcpTransportOPT,
 		rpcCh:	make(chan RPC, 1024),
@@ -66,6 +72,9 @@ func (t *TCPTransport) Close() error {
 	return t.listener.Close()
 }
 
+func (t *TCPTransport) RemoteAddr() net.Listener {
+	return t.listener
+}
 // Dial establishes a TCP connection to the specified address.
 // Once connected, it spawns a goroutine to handle the connection asynchronously.
 // Returns an error if the connection cannot be established.
@@ -108,7 +117,6 @@ func (t *TCPTransport) startAcceptLoop() {
 			fmt.Printf("TCP accept error: %s\n", err)
 			continue
 		}
-		fmt.Printf("Accepted new incoming connection from: %s\n", conn.LocalAddr())
 
 		go t.handleConn(conn, false)
 	}
@@ -134,7 +142,8 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool){
 		return
 	}
 
-	if t.tcpTransportOPT.OnPeer != nil{
+
+	if t.tcpTransportOPT.OnPeer != nil {
 		if err = t.tcpTransportOPT.OnPeer(peer); err != nil{
 			return
 		}
