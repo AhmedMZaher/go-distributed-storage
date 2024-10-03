@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"go-distributed-storage/p2p"
 	"log"
 	"time"
@@ -40,4 +42,14 @@ func main() {
 
 	go s3.Start()
 	time.Sleep(2 * time.Second)
+
+	data := bytes.NewReader([]byte("Hi my name is ahmed"))
+	key := "myfile"
+	
+	if err := s1.Store(key, data); err != nil {
+		fmt.Print(err)
+	}
+	// if err := s2.Store(key, data); err != nil {
+	// 	fmt.Print(err)
+	// }
 }

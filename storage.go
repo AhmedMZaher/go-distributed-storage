@@ -79,7 +79,7 @@ func NewStorage(storeOPT StoreOPT) *Storage {
 	if storeOPT.RootDir == "" {
 		storeOPT.RootDir = DefaultRootFolderName
 	}
-
+	storeOPT.RootDir = strings.ReplaceAll(storeOPT.RootDir, ":", "_")
 	return &Storage{
 		Config: storeOPT,
 	}
