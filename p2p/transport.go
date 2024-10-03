@@ -9,6 +9,7 @@ import "net"
 type Peer interface{
 	net.Conn
 	Send([]byte) error
+	CloseStream()
 }
 
 // Transport represents the communication layer used by peers to exchange data.

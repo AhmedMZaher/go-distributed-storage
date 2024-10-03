@@ -3,6 +3,7 @@ package p2p
 import (
 	"fmt"
 	"net"
+	"sync"
 )
 
 // TCPPeer represents a peer in the network using TCP for communication.
@@ -14,34 +15,42 @@ type TCPPeer struct {
 	net.Conn
 	// outbound indicates whether the connection is outbound (true) or inbound (false).
 	outbound bool
+
+	// wg (WaitGroup) is used to block the handling loop while waiting for RPC streaming
+	// messages to complete processing.
+	wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
+		wg:       &sync.WaitGroup{},
 	}
 }
 
+// This function implements the transport interface.
+func (p *TCPPeer) CloseStream() {
+	p.wg.Done()
+}
 
 func (p *TCPPeer) Send(bytes []byte) error {
 	_, err := p.Conn.Write(bytes)
 	return err
 }
+
 // TCPTransportOPT holds the configuration options for the TCP transport layer.
 // It includes the address to listen on and a function for handling handshakes.
 //
 // Fields:
 // - ListenAddress: The address on which the TCP transport will listen for incoming connections.
 // - HandshakeFunc: A function that defines the handshake process for establishing connections.
-type TCPTransportOPT struct{
+type TCPTransportOPT struct {
 	ListenAddress string
 	HandshakeFunc HandshakeFunc
-	Decoder Decoder
-	OnPeer func(Peer) error
+	Decoder       Decoder
+	OnPeer        func(Peer) error
 }
-
-
 
 // TCPTransport represents a transport layer for peer-to-peer communication over TCP.
 // It holds the configuration options, a network listener, a channel for RPC messages,
@@ -49,14 +58,14 @@ type TCPTransportOPT struct{
 // that is triggered when a new peer is connected.
 type TCPTransport struct {
 	tcpTransportOPT *TCPTransportOPT
-	listener      net.Listener
-	rpcCh	chan RPC
+	listener        net.Listener
+	rpcCh           chan RPC
 }
 
 func NewTCPTransport(tcpTransportOPT *TCPTransportOPT) *TCPTransport {
 	return &TCPTransport{
 		tcpTransportOPT: tcpTransportOPT,
-		rpcCh:	make(chan RPC, 1024),
+		rpcCh:           make(chan RPC, 1024),
 	}
 }
 
@@ -68,6 +77,7 @@ func (t *TCPTransport) Close() error {
 func (t *TCPTransport) RemoteAddr() net.Listener {
 	return t.listener
 }
+
 // Dial establishes a TCP connection to the specified address.
 // Once connected, it spawns a goroutine to handle the connection asynchronously.
 // Returns an error if the connection cannot be established.
@@ -82,9 +92,10 @@ func (t *TCPTransport) Dial(address string) error {
 
 	return nil
 }
+
 // Consume returns a read-only channel of RPCs that the TCPTransport has received.
 // This channel can be used to process incoming RPCs in a non-blocking manner.
-func (t *TCPTransport) Consume() <-chan RPC{
+func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcCh
 }
 
@@ -115,42 +126,49 @@ func (t *TCPTransport) startAcceptLoop() {
 	}
 }
 
-
 // handleConn handles an incoming TCP connection. It performs a handshake
 // with the peer, invokes the OnPeer callback if set, and continuously decodes
 // incoming RPC messages, sending them to the rpcCh channel.
 //
-// The function will log an error message and drop the connection if any error
-// occurs during the handshake or while decoding messages.
-func (t *TCPTransport) handleConn(conn net.Conn, outbound bool){
+// If the message is part of a stream, the read is blocked by using the peer's
+// WaitGroup (wg). This allows the server to directly use the net.Conn for reading
+// streaming data without sending the message to the RPC channel.
+func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	var err error
-	defer func(){
+	defer func() {
 		fmt.Printf("Dropping peer connection due to error: %v\n", err)
 	}()
 
 	peer := NewTCPPeer(conn, outbound)
 
-		
 	if err = t.tcpTransportOPT.HandshakeFunc(peer); err != nil {
 		return
 	}
 
-
 	if t.tcpTransportOPT.OnPeer != nil {
-		if err = t.tcpTransportOPT.OnPeer(peer); err != nil{
+		if err = t.tcpTransportOPT.OnPeer(peer); err != nil {
 			return
 		}
 	}
 
+	// Continuously decode the incoming RPC messages.
+	for {
+		rpc := RPC{}
+		rpc.From = conn.RemoteAddr()
 
-	rpc := RPC{}
-	for{
 		err = t.tcpTransportOPT.Decoder.Decode(conn, &rpc)
-		if err != nil{
+		if err != nil {
 			return
 		}
 
-		rpc.From = conn.RemoteAddr();
+		if rpc.Stream {
+			peer.wg.Add(1)
+			fmt.Printf("Received streaming RPC message from %v\n", rpc.From)
+			peer.wg.Wait()
+			fmt.Printf("Finished processing stream for peer %v\n", rpc.From)
+			continue
+		}
+
 		t.rpcCh <- rpc
-	}	
+	}
 }
