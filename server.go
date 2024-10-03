@@ -1,11 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"go-distributed-storage/p2p"
-	"io"
 	"log"
+	"net"
 	"sync"
 )
 
@@ -39,20 +40,39 @@ func NewFileServer(opt FileServerOPT) *FileServer {
 	}
 }
 
-type Payload struct{
-	Key 	string
-	Data 	[]byte
+type Message struct{
+	payload		any
 }
 
-func (s *FileServer) broadcast(payload Payload) error {
-	peers := []io.Writer{}
-	for _, peer := range s.peers {
-		peers = append(peers, peer)
+type StoreFileMessage struct{
+	Key		string
+	Size 	int64
+}
+
+type GetFileMessage struct{
+	Key		string
+}
+
+func (s *FileServer) broadcast(message Message) error {
+	buf := new(bytes.Buffer)
+
+	if err := gob.NewEncoder(buf).Encode(message); err != nil {
+		return err
 	}
 
-	mw := io.MultiWriter(peers...)
-	return gob.NewEncoder(mw).Encode(payload)
+	for _, peer := range s.peers {
+		if err := peer.Send([]byte{p2p.IncomingMessage}); err != nil {
+			return err
+		}
+
+		if err := peer.Send(buf.Bytes()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
+
 func (s *FileServer) Stop() {
 	close(s.quitCh)
 }
@@ -76,11 +96,41 @@ func (s *FileServer) loop() {
 	for {
 		select {
 		case rpc := <-s.Config.Transport.Consume():
-			fmt.Println(rpc)
+			var message Message
+
+			if err := gob.NewDecoder(bytes.NewBuffer(rpc.Payload)).Decode(&message); err != nil {
+				fmt.Printf("Decoding error: ", err)
+			}
+			
+			if err := s.handleMessage(rpc.From, message); err != nil {
+				fmt.Printf("Handling message error: ", err)
+			}
+			
 		case <-s.quitCh:
 			return
 		}
 	}
+}
+
+// handleMessage processes incoming messages and delegates them to the appropriate handler
+// based on the type of the message payload.
+func (s *FileServer) handleMessage(from net.Addr, message Message) error {
+	switch payloadType := message.payload.(type) {
+	case GetFileMessage:
+			return s.handleGetFileMessage(from, payloadType)
+	case StoreFileMessage:
+		return s.handleStoreFileMessage(from, payloadType)
+	}
+
+	return nil
+}
+
+func (s *FileServer) handleGetFileMessage (from net.Addr, message GetFileMessage) error {
+	return nil	
+}
+
+func (s *FileServer) handleStoreFileMessage (from net.Addr, message StoreFileMessage) error {
+	return nil	
 }
 
 // connectToBootstrapNodes attempts to connect to all bootstrap nodes specified in the server's configuration.
