@@ -173,14 +173,22 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	time.Sleep(time.Millisecond * 5)
 
+	peers := []io.Writer{}
 	for _, peer := range s.peers {
-		peer.Send([]byte{p2p.IncomingStream})
-		_, err := io.Copy(peer, fileBuffer)
-		if err != nil {
-			return err
-		}
-
+		peers = append(peers, peer)
 	}
+	
+	mw := io.MultiWriter(peers...)
+	mw.Write([]byte{p2p.IncomingStream})
+	mw.Write(fileBuffer.Bytes())
+	// for _, peer := range s.peers {
+	// 	peer.Send([]byte{p2p.IncomingStream})
+	// 	_, err := io.Copy(peer, fileBuffer)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// }
 
 	fmt.Printf("[%s] received and written (%d) bytes to disk\n", s.Config.Transport.RemoteAddr(), size)
 	return nil
