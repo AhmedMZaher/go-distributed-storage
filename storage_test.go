@@ -18,11 +18,11 @@ func TestStore(t *testing.T) {
 		fileName := fmt.Sprintf("foo_%d", i)
 		data := []byte("Hello! How are you ?")
 
-		if err := storage.StoreFile(fileName, bytes.NewBuffer(data)); err != nil {
+		if _, err := storage.StoreFile(fileName, bytes.NewBuffer(data)); err != nil {
 			t.Error(err)
 		}
 
-		r, err := storage.ReadFile(fileName)
+		r, _, err := storage.ReadFile(fileName)
 		if err != nil {
 			t.Error(err)
 		}

@@ -120,21 +120,21 @@ func (s *Storage) DeleteFile(fileName string) error {
 // Storing data in a buffer allows for efficient access without the need to
 // maintain file handles open longer than necessary, which reduces the risk
 // of file access conflicts in concurrent environments.
-func (s *Storage) ReadFile(fileName string) (io.Reader, error) {
-	f, err := s.ReadIntoFile(fileName)
+func (s *Storage) ReadFile(fileName string) (io.Reader, int64, error) {
+	f, err := s.readIntoFile(fileName)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	defer f.Close()
 
 	buf := new(bytes.Buffer)
 
-	_, err = io.Copy(buf, f)
-	return buf, err
+	fileSize, err := io.Copy(buf, f)
+	return buf, fileSize, nil
 }
 
-func (s *Storage) ReadIntoFile(fileName string) (io.ReadCloser, error) {
+func (s *Storage) readIntoFile(fileName string) (io.ReadCloser, error) {
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
 	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
 	return os.Open(fullPathWithRoot)
@@ -143,27 +143,27 @@ func (s *Storage) ReadIntoFile(fileName string) (io.ReadCloser, error) {
 // StoreFile reads from the input stream and writes the data to a file.
 // The file path is determined by applying a transformation to the fileName.
 // It creates necessary directories if they don't exist.
-func (s *Storage) StoreFile(fileName string, inputStream io.Reader) error {
+func (s *Storage) StoreFile(fileName string, inputStream io.Reader) (int64, error) {
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
 	pathNameWithRoot := s.prependTheRoot(fileIdentifier.PathName)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 
 	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
 
 	destinationFile, err := os.Create(fullPathWithRoot)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	n, err := io.Copy(destinationFile, inputStream)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	log.Printf("%d bytes written to %s", n, fullPathWithRoot)
 
 	// Ensure the file is closed after writing
-	return destinationFile.Close()
+	return n, destinationFile.Close()
 }
