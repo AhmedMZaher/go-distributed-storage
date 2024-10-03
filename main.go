@@ -1,9 +1,10 @@
 package main
 
 import (
-	"bytes"
+	// "bytes"
 	"fmt"
 	"go-distributed-storage/p2p"
+	"io"
 	"log"
 	"time"
 )
@@ -30,7 +31,7 @@ func makeServer(listenAddress string, nodes ...string) *FileServer {
 	return server
 }
 func main() {
-	s1 := makeServer("127.0.0.5:3000", "")
+	s1 := makeServer("127.0.0.5:3000",)
 	s2 := makeServer("127.0.0.5:5000", "127.0.0.5:3000")
 	s3 := makeServer("127.0.0.5:7000", "127.0.0.5:3000")
 
@@ -41,13 +42,26 @@ func main() {
 	go func() { log.Fatal(s3.Start()) }()
 	time.Sleep(5 * time.Millisecond)
 
-	data := bytes.NewReader([]byte("Hi my name is ahmed"))
+	// data := bytes.NewReader([]byte("Hi my name is ahmed"))
 	key := "myfile"
-	
-	if err := s1.Store(key, data); err != nil {
-		fmt.Print(err)
-	}
-	// if err := s2.Store(key, data); err != nil {
+
+	// ////////////////////////////////////////////
+	// fmt.Println("---------------- TESTING STORE ---------------- ")
+	// if err := s1.Store(key, data); err != nil {
 	// 	fmt.Print(err)
 	// }
+	// time.Sleep(2 * time.Second)
+	//////////////////////////////////////////////
+	fmt.Println(" ---------------- TESTING GET ---------------- ")
+	r, err := s2.Get(key)
+	if err != nil {
+		fmt.Print(err)
+	}
+	
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		fmt.Print(err)
+	}
+	fmt.Println(string(buf))
+	select{}
 }

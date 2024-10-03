@@ -209,7 +209,7 @@ func (s *FileServer) handleMessage(from net.Addr, message Message) error {
 
 func (s *FileServer) handleGetFileMessage(from net.Addr, message GetFileMessage) error {
 	if !s.Storage.HasKey(message.Key) {
-		return fmt.Errorf("file with key %s not found on disk", message.Key)
+		return fmt.Errorf("file with key %s not found on %s disk", message.Key, s.Config.Transport.RemoteAddr())
 	}
 
 	fmt.Printf("[%s] serving file with key (%s) over the network\n", s.Config.Transport.RemoteAddr(), message.Key)

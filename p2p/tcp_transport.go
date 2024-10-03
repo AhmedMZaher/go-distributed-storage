@@ -166,7 +166,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 			peer.wg.Add(1)
 			fmt.Printf("%s Received streaming RPC message from %v\n", t.RemoteAddr(), rpc.From)
 			peer.wg.Wait()
-			fmt.Printf("Finished processing stream for peer %v\n", rpc.From)
+			fmt.Printf("Finished processing stream from peer %v\n", rpc.From)
 			continue
 		}
 
