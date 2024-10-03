@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"go-distributed-storage/p2p"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -126,11 +127,48 @@ func (s *FileServer) handleMessage(from net.Addr, message Message) error {
 }
 
 func (s *FileServer) handleGetFileMessage (from net.Addr, message GetFileMessage) error {
-	return nil	
+	if !s.Storage.HasKey(message.Key) {
+		return fmt.Errorf("file with key %s not found on disk", message.Key)
+	}
+
+	fmt.Printf("[%s] serving file with key (%s) over the network\n", s.Config.Transport.RemoteAddr(), message.Key)
+
+	r, err := s.Storage.ReadFile(message.Key)
+	if err != nil {
+		return err
+	}
+
+	peer, isExist := s.peers[from.String()]
+	if !isExist{
+		return fmt.Errorf("peer %s not found in peer map", from.String())
+	}
+
+	n, err := io.Copy(peer, r)
+	if err != nil {
+        return fmt.Errorf("error copying file data to peer: %v", err)
+    }
+
+	fmt.Printf("[%s] successfully written %d bytes to peer %s\n", s.Config.Transport.RemoteAddr(), n, from.String())
+
+	return nil 
 }
 
 func (s *FileServer) handleStoreFileMessage (from net.Addr, message StoreFileMessage) error {
-	return nil	
+	peer, isExist := s.peers[from.String()]
+	if !isExist{
+		return fmt.Errorf("peer %s not found in peer map", from.String())
+	}
+
+	err := s.Storage.StoreFile(message.Key, io.LimitReader(peer, message.Size))
+	if err != nil {
+		return fmt.Errorf("error storing file with key %s from peer %s: %v", message.Key, from.String(), err)
+	}
+	
+	fmt.Printf("[%s] successfully stored file with key (%s) of size %d bytes from peer %s\n", s.Config.Transport.RemoteAddr(), message.Key, message.Size, from.String())
+
+	peer.CloseStream()
+
+	return nil
 }
 
 // connectToBootstrapNodes attempts to connect to all bootstrap nodes specified in the server's configuration.
