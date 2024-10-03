@@ -100,12 +100,12 @@ func (s *FileServer) loop() {
 		case rpc := <-s.Config.Transport.Consume():
 			var message Message
 
-			if err := gob.NewDecoder(bytes.NewBuffer(rpc.Payload)).Decode(&message); err != nil {
-				fmt.Printf("Decoding error: ", err)
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&message); err != nil {
+				fmt.Println("Decoding error: ", err)
 			}
 
 			if err := s.handleMessage(rpc.From, message); err != nil {
-				fmt.Printf("Handling message error: ", err)
+				fmt.Println("Handling message error: ", err)
 			}
 
 		case <-s.quitCh:
@@ -175,13 +175,14 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	for _, peer := range s.peers {
 		peer.Send([]byte{p2p.IncomingStream})
-		n, err := io.Copy(peer, fileBuffer)
+		_, err := io.Copy(peer, fileBuffer)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("[%s] received and written (%d) bytes to disk\n", s.Config.Transport.RemoteAddr(), n)
+
 	}
 
+	fmt.Printf("[%s] received and written (%d) bytes to disk\n", s.Config.Transport.RemoteAddr(), size)
 	return nil
 }
 
@@ -257,7 +258,7 @@ func (s *FileServer) connectToBootstrapNodes() error {
 		}
 
 		go func() {
-			fmt.Printf("%s Attempting to connect to bootstrap node: %s\n", s.Config.Transport.RemoteAddr().Addr().String(), address)
+			fmt.Printf("%s Attempting to connect to bootstrap node: %s\n", s.Config.Transport.RemoteAddr(), address)
 			if err := s.Config.Transport.Dial(address); err != nil {
 				log.Printf("Failed to connect to bootstrap node %s: %v\n", address, err)
 			}

@@ -162,7 +162,6 @@ func (s *Storage) StoreFile(fileName string, inputStream io.Reader) (int64, erro
 		return 0, err
 	}
 
-	log.Printf("%d bytes written to %s", n, fullPathWithRoot)
 
 	// Ensure the file is closed after writing
 	return n, destinationFile.Close()

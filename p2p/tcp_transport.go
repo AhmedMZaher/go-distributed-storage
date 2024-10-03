@@ -74,8 +74,9 @@ func (t *TCPTransport) Close() error {
 	return t.listener.Close()
 }
 
-func (t *TCPTransport) RemoteAddr() net.Listener {
-	return t.listener
+// Implements the transport interface
+func (t *TCPTransport) RemoteAddr() string {
+	return t.listener.Addr().String()
 }
 
 // Dial establishes a TCP connection to the specified address.
@@ -163,7 +164,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 
 		if rpc.Stream {
 			peer.wg.Add(1)
-			fmt.Printf("Received streaming RPC message from %v\n", rpc.From)
+			fmt.Printf("%s Received streaming RPC message from %v\n", t.RemoteAddr(), rpc.From)
 			peer.wg.Wait()
 			fmt.Printf("Finished processing stream for peer %v\n", rpc.From)
 			continue

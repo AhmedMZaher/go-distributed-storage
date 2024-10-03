@@ -28,6 +28,18 @@ type DefaultDecoder struct{}
 // It reads up to 1024 bytes into a buffer and assigns it to the message's Payload field.
 // Returns an error if the reading fails.
 func (Decoder DefaultDecoder) Decode(reader io.Reader, msg *RPC) error {
+	peekBuf := make([]byte, 1)
+	if _, err := reader.Read(peekBuf); err != nil {
+		return nil
+	}
+
+	// In case of a stream we are not decoding what is being sent over the network.
+	stream := peekBuf[0] == IncomingStream
+	if stream {
+		msg.Stream = true
+		return nil
+	}
+
 	buf := make([]byte, 1024)
 	n, err := reader.Read(buf)
 	if err != nil {
