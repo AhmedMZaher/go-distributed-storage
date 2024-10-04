@@ -113,31 +113,31 @@ func (s *Storage) DeleteFile(fileName string) error {
 	return os.RemoveAll(firstPathSegmentWithRoot)
 }
 
-// ReadFile reads the contents of a specified file and returns an io.Reader.
-// It uses a buffer to temporarily store the file data in memory rather than writing
-// directly to a file. This approach avoids issues related to file locking and
-// access contention, as the file can be closed immediately after reading.
-// Storing data in a buffer allows for efficient access without the need to
-// maintain file handles open longer than necessary, which reduces the risk
-// of file access conflicts in concurrent environments.
+
 func (s *Storage) ReadFile(fileName string) (io.Reader, int64, error) {
-	f, err := s.readIntoFile(fileName)
+	return s.readIntoFile(fileName)
+}
+
+// readIntoFile opens a specified file for reading. 
+// It uses the PathTransformFunc from the Storage configuration to transform the file name. 
+// The function constructs the full file path by appending the root directory. 
+// It then opens the file at the specified full path and retrieves the file's size upon successful opening.
+func (s *Storage) readIntoFile(fileName string) (io.ReadCloser, int64, error) {
+	fileIdentifier := s.Config.PathTranformFunc(fileName)
+	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
+
+	
+	f, err := os.Open(fullPathWithRoot)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	defer f.Close()
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return nil, 0, err
+	}
 
-	buf := new(bytes.Buffer)
-
-	fileSize, err := io.Copy(buf, f)
-	return buf, fileSize, nil
-}
-
-func (s *Storage) readIntoFile(fileName string) (io.ReadCloser, error) {
-	fileIdentifier := s.Config.PathTranformFunc(fileName)
-	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
-	return os.Open(fullPathWithRoot)
+	return f, fileInfo.Size(), nil
 }
 
 // StoreFile reads from the input stream and writes the data to a file.
