@@ -61,7 +61,7 @@ func (s *FileServer) broadcast(message *Message) error {
 	if err := gob.NewEncoder(buf).Encode(message); err != nil {
 		return err
 	}
-	
+
 	for _, peer := range s.peers {
 		if err := peer.Send([]byte{p2p.IncomingMessage}); err != nil {
 			return err
@@ -114,6 +114,13 @@ func (s *FileServer) loop() {
 	}
 }
 
+// Get retrieves a file by its key from local storage or peers.
+//
+// Checks if the file exists locally and returns it if found.
+// If not found, broadcasts a request to peers for the file.
+// Waits briefly before attempting to read the file from peers.
+// Reads the file size from each peer and stores the file locally.
+// Logs the successful retrieval and storage of the file from a peer.
 func (s *FileServer) Get(key string) (io.Reader, error) {
 	if s.Storage.HasKey(key) {
 		fmt.Printf("[%s] file with key (%s) found locally\n", s.Config.Transport.RemoteAddr(), key)
@@ -150,12 +157,19 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 	return r, err
 }
 
+// Store saves a file to storage and broadcasts the event.
+//
+// Reads from the provided io.Reader while storing data in a buffer.
+// Stores the file with the specified key and retrieves its size.
+// Constructs a message with the key and size for broadcasting.
+// Sends the storage event to all peers and initiates data transfer.
+// Logs the total bytes received and written to disk.
 func (s *FileServer) Store(key string, r io.Reader) error {
 	var (
 		fileBuffer = new(bytes.Buffer)
 		tee        = io.TeeReader(r, fileBuffer)
 	)
- 	size, err := s.Storage.StoreFile(key, tee)
+	size, err := s.Storage.StoreFile(key, tee)
 	if err != nil {
 		return err
 	}
@@ -177,18 +191,10 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	for _, peer := range s.peers {
 		peers = append(peers, peer)
 	}
-	
+
 	mw := io.MultiWriter(peers...)
 	mw.Write([]byte{p2p.IncomingStream})
 	mw.Write(fileBuffer.Bytes())
-	// for _, peer := range s.peers {
-	// 	peer.Send([]byte{p2p.IncomingStream})
-	// 	_, err := io.Copy(peer, fileBuffer)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// }
 
 	fmt.Printf("[%s] received and written (%d) bytes to disk\n", s.Config.Transport.RemoteAddr(), size)
 	return nil
@@ -207,6 +213,15 @@ func (s *FileServer) handleMessage(from net.Addr, message Message) error {
 	return nil
 }
 
+// handleGetFileMessage processes a file retrieval request from a peer.
+//
+// Validates the existence of the requested file in storage.
+// Logs the operation of serving the file over the network.
+// Retrieves the file reader and its size from storage.
+// Confirms the requesting peer is present in the peer map.
+// Sends a stream initiation signal to the peer.
+// Writes the file size to the peer using binary format.
+// Copies the file data to the peer's stream and logs the transfer.
 func (s *FileServer) handleGetFileMessage(from net.Addr, message GetFileMessage) error {
 	if !s.Storage.HasKey(message.Key) {
 		return fmt.Errorf("file with key %s not found on %s disk", message.Key, s.Config.Transport.RemoteAddr())
@@ -236,6 +251,13 @@ func (s *FileServer) handleGetFileMessage(from net.Addr, message GetFileMessage)
 	return nil
 }
 
+// Handles the reception of a file storage message from a peer.
+//
+// Verifies the existence of the sending peer in the peer map.
+// Stores the file associated with the provided key from the peer's stream.
+// Logs the successful storage of the file, including the key,
+// size, and peer address.
+// Closes the stream for the sending peer to manage resources.
 func (s *FileServer) handleStoreFileMessage(from net.Addr, message StoreFileMessage) error {
 	peer, isExist := s.peers[from.String()]
 	if !isExist {
