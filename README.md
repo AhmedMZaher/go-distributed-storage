@@ -1,7 +1,22 @@
 # go-distributed-storage
 
-- A decentralized file storage system implemented in Go, allowing for peer-to-peer file storage and retrieval across a network of nodes. 
-- The transport library used in this project is generic and can be utilized for any application requiring network communication.
+## Server Functionality and Features:
+
+- Implements a distributed file system with peer-to-peer communication.
+- Manages file storage and retrieval operations across multiple peers.
+- Broadcasting: Enables communication with all connected peers.
+- Message Handling: Processes messages for file storage and retrieval requests.
+- Generic TCP Library Features:
+
+## Transport Interface: Facilitates remote communication between peers.
+- Connection Management: Handles dialing and accepting TCP connections.
+- Stream Management: Supports sending and closing streams for efficient data transfer.
+- Generic Storage Library Features:
+
+- File Management: Provides functionalities for storing, reading, deleting, and checking file existence.
+- Path Handling: Supports default root folders and hash-based path generation for unique file storage.
+- File Identifier: Encapsulates file path and name for easier manipulation and retrieval.
+
 
 ## Project Features
 
