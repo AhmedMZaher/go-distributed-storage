@@ -180,7 +180,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	message := Message{
 		Payload: StoreFileMessage{
 			Key:  key,
-			Size: size,
+			Size: 16 + size,
 		},
 	}
 
