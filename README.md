@@ -54,10 +54,3 @@ To install and run this project, you need to have Go installed on your system. T
 3. Build the project:
    ```
    go build ./cmd/main.go
-
-## API
-
-The `FileServer` struct provides the main functionality:
-
-- `Store(key string, r io.Reader) error`: Stores a file with the given key
-- `Get(key string) (io.Reader, error)`: Retrieves a file with the given key
