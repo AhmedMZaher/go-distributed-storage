@@ -117,6 +117,10 @@ func (s *Storage) ReadFile(fileName string) (io.Reader, int64, error) {
 	return s.readIntoFile(fileName)
 }
 
+// ReadFileDecrypted reads a file, decrypts its contents using the provided
+// decryption function, and returns an io.Reader for the decrypted data along 
+// with the original file size. The custom decryption function allows for 
+// flexibility in specifying different decryption algorithms as needed.
 func (s *Storage) ReadFileDecrypted(fileName string, decryptFunc func([]byte, io.Writer, io.Reader) (int64, error), key []byte) (io.Reader, int64, error) {
 	file, size, err := s.readIntoFile(fileName)
 	if err != nil {
