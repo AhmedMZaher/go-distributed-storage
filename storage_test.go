@@ -32,6 +32,7 @@ func TestStore(t *testing.T) {
 			t.Error("Wrong data Mismatch!")
 		}
 
+		r.Close()
 		if f := storage.HasKey(fileName); !f {
 			t.Error("Expected file key to exist for:", fileName)
 		}

@@ -113,7 +113,7 @@ func (s *Storage) DeleteFile(fileName string) error {
 	return os.RemoveAll(firstPathSegmentWithRoot)
 }
 
-func (s *Storage) ReadFile(fileName string) (io.Reader, int64, error) {
+func (s *Storage) ReadFile(fileName string) (io.ReadCloser, int64, error) {
 	return s.readIntoFile(fileName)
 }
 
