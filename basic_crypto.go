@@ -16,10 +16,10 @@ func (b *BasicCrypto) newEncryptionKey() []byte {
 	return keyBuf
 }
 
-func (b *BasicCrypto) copyStream(stream cipher.Stream, dst io.Writer, src io.Reader) (int, error) {
+func (b *BasicCrypto) copyStream(stream cipher.Stream, dst io.Writer, src io.Reader) (int64, error) {
 	const bufferSize = 32 * 1024
 	buf := make([]byte, bufferSize)
-	totalWritten := 0
+	var totalWritten int64 = 0
 
 	for {
 		n, readErr := src.Read(buf)
@@ -31,7 +31,7 @@ func (b *BasicCrypto) copyStream(stream cipher.Stream, dst io.Writer, src io.Rea
 			if writeErr != nil {
 				return totalWritten, writeErr
 			}
-			totalWritten += nn
+			totalWritten += int64(nn)
 		}
 
 		// Handle the end of the file
@@ -48,7 +48,7 @@ func (b *BasicCrypto) copyStream(stream cipher.Stream, dst io.Writer, src io.Rea
 // Encrypt encrypts data from src to dst using AES in CTR mode.
 // It generates a random IV, writes it to the beginning of dst, initializes the AES CTR stream with the key and IV,
 // and then uses the stream to encrypt the remaining data.
-func (b *BasicCrypto) Encrypt(encryptionKey []byte, dst io.Writer, src io.Reader) (int, error) {
+func (b *BasicCrypto) Encrypt(encryptionKey []byte, dst io.Writer, src io.Reader) (int64, error) {
 	cipherBlock, err := aes.NewCipher(encryptionKey)
 	if err != nil {
 		return 0, err
@@ -72,7 +72,7 @@ func (b *BasicCrypto) Encrypt(encryptionKey []byte, dst io.Writer, src io.Reader
 // copyDecrypt decrypts data from src to dst using AES in CTR mode.
 // It reads an IV from the beginning of src, initializes the AES CTR stream with the key and IV,
 // and then uses the stream to decrypt the remaining data.
-func (b *BasicCrypto) Decrypt(encryptionKey []byte, dst io.Writer, src io.Reader) (int, error) {
+func (b *BasicCrypto) Decrypt(encryptionKey []byte, dst io.Writer, src io.Reader) (int64, error) {
 	cipherBlock, err := aes.NewCipher(encryptionKey)
 	if err != nil {
 		return 0, err
