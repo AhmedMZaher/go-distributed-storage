@@ -139,7 +139,7 @@ func (s *Storage) readIntoFile(fileName string) (io.ReadCloser, int64, error) {
 
 // storeToDestinationFile is a helper function that manages file path setup and creation,
 // allowing for either plain or encrypted data copying using the provided copyFunc.
-func (s *Storage) storeToDestinationFile(fileName string, inputStream io.Reader, copyFunc func(io.Reader, *os.File) (int64, error)) (int64, error) {
+func (s *Storage) storeToDestinationFile(fileName string, inputStream io.Reader, copyFunc func(io.Writer, io.Reader) (int64, error)) (int64, error) {
 	// Transform and prepare the file path
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
 	pathNameWithRoot := s.prependTheRoot(fileIdentifier.PathName)
@@ -160,22 +160,22 @@ func (s *Storage) storeToDestinationFile(fileName string, inputStream io.Reader,
 	defer destinationFile.Close()
 
 	// Use the specified copy function to write data to the file
-	return copyFunc(inputStream, destinationFile)
+	return copyFunc(destinationFile, inputStream)
 }
 
 // StoreFile reads from the input stream and writes unencrypted data to a file.
 func (s *Storage) StoreFile(fileName string, inputStream io.Reader) (int64, error) {
 	// Use io.Copy for direct data copying
-	return s.storeToDestinationFile(fileName, inputStream, func(src io.Reader, dst *os.File) (int64, error) {
+	return s.storeToDestinationFile(fileName, inputStream, func(dst io.Writer, src io.Reader) (int64, error) {
 		return io.Copy(dst, src)
 	})
 }
 
 // StoreFileEncrypted reads from the input stream, encrypts the data using the provided encryptFunc to be more flexible,
 // and writes it to a file.
-func (s *Storage) StoreFileEncrypted(fileName string, inputStream io.Reader, encryptFunc func([]byte, io.Reader, *os.File) (int64, error), key []byte) (int64, error) {
+func (s *Storage) StoreFileEncrypted(fileName string, inputStream io.Reader, encryptFunc func([]byte, io.Writer, io.Reader) (int64, error), key []byte) (int64, error) {
 	// Use the user-defined encryptFunc for encrypted data copying
-	return s.storeToDestinationFile(fileName, inputStream, func(src io.Reader, dst *os.File) (int64, error) {
-		return encryptFunc(key, src, dst)
+	return s.storeToDestinationFile(fileName, inputStream, func(dst io.Writer, src io.Reader) (int64, error) {
+		return encryptFunc(key, dst, src)
 	})
 }
