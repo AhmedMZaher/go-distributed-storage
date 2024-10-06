@@ -14,6 +14,8 @@ import (
 )
 
 type FileServerOPT struct {
+	Crypto           Cipher
+	encryptionKey    []byte
 	RootDir          string
 	Transport        p2p.Transport
 	PathTranformFunc PathTranformSignature
@@ -169,7 +171,8 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		fileBuffer = new(bytes.Buffer)
 		tee        = io.TeeReader(r, fileBuffer)
 	)
-	size, err := s.Storage.StoreFile(key, tee)
+	// size, err := s.Storage.StoreFile(key, tee)
+	size, err := s.Storage.StoreFileEncrypted(key, tee, s.Config.Crypto.Encrypt, s.Config.encryptionKey)
 	if err != nil {
 		return err
 	}
@@ -194,7 +197,8 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	mw := io.MultiWriter(peers...)
 	mw.Write([]byte{p2p.IncomingStream})
-	mw.Write(fileBuffer.Bytes())
+	// mw.Write(fileBuffer.Bytes())
+	s.Config.Crypto.Encrypt(s.Config.encryptionKey, mw, fileBuffer)
 
 	fmt.Printf("[%s] received and written (%d) bytes to disk\n", s.Config.Transport.RemoteAddr(), size)
 	return nil
