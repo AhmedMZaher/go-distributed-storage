@@ -123,6 +123,7 @@ func (s *FileServer) loop() {
 // Waits briefly before attempting to read the file from peers.
 // Reads the file size from each peer and stores the file locally.
 // Logs the successful retrieval and storage of the file from a peer.
+// Sets a timeout for reading the file size. If the read operation times out, it proceeds to the next peer.
 func (s *FileServer) Get(key string) (io.Reader, error) {
 	if s.Storage.HasKey(key) {
 		fmt.Printf("[%s] file with key (%s) found locally\n", s.Config.Transport.RemoteAddr(), key)
@@ -147,12 +148,36 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 
 	for _, peer := range s.peers {
 		var fileSize int64
-		binary.Read(peer, binary.LittleEndian, &fileSize)
-
-		if _, err := s.Storage.StoreFile(key, io.LimitReader(peer, fileSize)); err != nil {
-			return nil, err
+		
+		// Set a timeout duration for reading the file size
+		readTimeout := 5 * time.Second
+		done := make(chan error) // Channel to signal completion of read operation
+	
+		
+		go func(peer p2p.Peer) {
+			err := binary.Read(peer, binary.LittleEndian, &fileSize)
+			done <- err // Send the result (error or nil) back to the main routine
+		}(peer)
+	
+		
+		select {
+		case err := <-done:
+			if err != nil {
+				fmt.Printf("Error reading file size from peer %s: %v\n", peer.RemoteAddr().String(), err)
+				continue
+			}
+		case <-time.After(readTimeout):
+			fmt.Printf("Timeout while waiting for file size from peer %s\n", peer.RemoteAddr().String())
+			continue
 		}
+	
+		
+		if _, err := s.Storage.StoreFile(key, io.LimitReader(peer, fileSize)); err != nil {
+			return nil, err 
+		}
+
 		fmt.Printf("[%s] successfully received and stored file with key (%s) of size %d bytes from peer %s\n", s.Config.Transport.RemoteAddr(), key, fileSize, peer.RemoteAddr().String())
+		
 		peer.CloseStream()
 	}
 
