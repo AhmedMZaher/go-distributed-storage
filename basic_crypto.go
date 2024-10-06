@@ -10,6 +10,12 @@ import (
 type BasicCrypto struct {
 }
 
+func (b *BasicCrypto) newEncryptionKey() []byte {
+	keyBuf := make([]byte, 32)
+	io.ReadFull(rand.Reader, keyBuf)
+	return keyBuf
+}
+
 func (b *BasicCrypto) copyStream(stream cipher.Stream, dst io.Writer, src io.Reader) (int, error) {
 	const bufferSize = 32 * 1024
 	buf := make([]byte, bufferSize)
@@ -17,7 +23,7 @@ func (b *BasicCrypto) copyStream(stream cipher.Stream, dst io.Writer, src io.Rea
 
 	for {
 		n, readErr := src.Read(buf)
-		if (n > 0) {
+		if n > 0 {
 			stream.XORKeyStream(buf[:n], buf[:n])
 
 			// Write the processed data to the destination
