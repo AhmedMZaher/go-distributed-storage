@@ -54,3 +54,10 @@ To install and run this project, you need to have Go installed on your system. T
 3. Build the project:
    ```
    go build ./cmd/main.go
+
+## Latest Release
+The latest stable release can be found on the [Releases](https://github.com/AhmedMZaher/go-distributed-storage/releases) page.
+
+## Changelog
+For detailed changes in each version, please see the [Changelog](https://github.com/AhmedMZaher/go-distributed-storage/blob/main/CHANGELOG.md).
+
