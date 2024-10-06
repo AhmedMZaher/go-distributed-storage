@@ -126,7 +126,8 @@ func (s *FileServer) loop() {
 func (s *FileServer) Get(key string) (io.Reader, error) {
 	if s.Storage.HasKey(key) {
 		fmt.Printf("[%s] file with key (%s) found locally\n", s.Config.Transport.RemoteAddr(), key)
-		r, _, err := s.Storage.ReadFile(key)
+		// r, _, err := s.Storage.ReadFile(key)
+		r, _, err := s.Storage.ReadFileDecrypted(key, s.Config.Crypto.Decrypt, s.Config.encryptionKey)
 		return r, err
 	}
 
@@ -155,7 +156,8 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		peer.CloseStream()
 	}
 
-	r, _, err := s.Storage.ReadFile(key)
+	// r, _, err := s.Storage.ReadFile(key)
+	r, _, err := s.Storage.ReadFileDecrypted(key, s.Config.Crypto.Decrypt, s.Config.encryptionKey)
 	return r, err
 }
 
@@ -180,7 +182,8 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	message := Message{
 		Payload: StoreFileMessage{
 			Key:  key,
-			Size: 16 + size,
+			// Total size includes 16 bytes for the Initialization Vector (IV) at the beginning of the file.
+			Size: 16 + size, 
 		},
 	}
 
