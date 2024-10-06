@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -114,6 +115,25 @@ func (s *Storage) DeleteFile(fileName string) error {
 
 func (s *Storage) ReadFile(fileName string) (io.Reader, int64, error) {
 	return s.readIntoFile(fileName)
+}
+
+func (s *Storage) ReadFileDecrypted(fileName string, decryptFunc func([]byte, io.Writer, io.Reader) (int64, error), key []byte) (io.Reader, int64, error) {
+	file, size, err := s.readIntoFile(fileName)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer file.Close()
+
+	// Create a buffer to handle the decrypted data
+	var buf bytes.Buffer
+
+	// Decrypt the data directly into the buffer
+	_, err = decryptFunc(key, &buf, file)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return &buf, size, nil
 }
 
 // readIntoFile opens a specified file for reading.
