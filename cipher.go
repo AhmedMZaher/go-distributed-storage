@@ -2,7 +2,7 @@ package main
 
 import "io"
 
-type cipher interface {
-	encrypt([]byte, io.Writer, io.Reader) (int64, error)
-	decrypt([]byte, io.Writer, io.Reader) (int64, error)
+type Cipher interface {
+	Encrypt([]byte, io.Writer, io.Reader) (int, error)
+	Decrypt([]byte, io.Writer, io.Reader) (int, error)
 }
