@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -65,7 +64,7 @@ func (fileIdentifier *FileIdentifier) BuildFilePath() string {
 type PathTranformSignature func(string) FileIdentifier
 type StoreOPT struct {
 	PathTranformFunc PathTranformSignature
-	RootDir			string
+	RootDir          string
 }
 
 type Storage struct {
@@ -113,20 +112,18 @@ func (s *Storage) DeleteFile(fileName string) error {
 	return os.RemoveAll(firstPathSegmentWithRoot)
 }
 
-
 func (s *Storage) ReadFile(fileName string) (io.Reader, int64, error) {
 	return s.readIntoFile(fileName)
 }
 
-// readIntoFile opens a specified file for reading. 
-// It uses the PathTransformFunc from the Storage configuration to transform the file name. 
-// The function constructs the full file path by appending the root directory. 
+// readIntoFile opens a specified file for reading.
+// It uses the PathTransformFunc from the Storage configuration to transform the file name.
+// The function constructs the full file path by appending the root directory.
 // It then opens the file at the specified full path and retrieves the file's size upon successful opening.
 func (s *Storage) readIntoFile(fileName string) (io.ReadCloser, int64, error) {
 	fileIdentifier := s.Config.PathTranformFunc(fileName)
 	fullPathWithRoot := s.prependTheRoot(fileIdentifier.BuildFilePath())
 
-	
 	f, err := os.Open(fullPathWithRoot)
 	if err != nil {
 		return nil, 0, err
@@ -161,7 +158,6 @@ func (s *Storage) StoreFile(fileName string, inputStream io.Reader) (int64, erro
 	if err != nil {
 		return 0, err
 	}
-
 
 	// Ensure the file is closed after writing
 	return n, destinationFile.Close()
