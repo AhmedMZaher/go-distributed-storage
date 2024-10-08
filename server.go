@@ -20,6 +20,7 @@ type FileServerOPT struct {
 	Transport        p2p.Transport
 	PathTranformFunc PathTranformSignature
 	BootstrapNodes   []string
+	IsBootstrapNode  bool
 }
 
 type FileServer struct {
@@ -30,6 +31,9 @@ type FileServer struct {
 
 	Storage Storage
 	quitCh  chan struct{}
+
+	// PeersAddresses holds the addresses of peer nodes in the distributed network.
+	PeersAddresses []string
 }
 
 func NewFileServer(opt FileServerOPT) *FileServer {
@@ -56,6 +60,14 @@ type StoreFileMessage struct {
 
 type GetFileMessage struct {
 	Key string
+}
+
+type PeersInfoMessage struct {
+	Addresses []string
+}
+
+type NodeIntroductionMessage struct {
+	Address string
 }
 
 func (s *FileServer) broadcast(message *Message) error {
@@ -88,6 +100,26 @@ func (s *FileServer) OnPeer(p p2p.Peer) error {
 	s.peers[p.RemoteAddr().String()] = p
 
 	log.Printf("%s accepted peer connection from: %s\n", p.LocalAddr(), p.RemoteAddr())
+
+	if s.Config.IsBootstrapNode {
+		msg := Message{
+			Payload: PeersInfoMessage{
+				Addresses: s.PeersAddresses,
+			},
+		}
+		
+		if err := p.Send([]byte{p2p.IncomingMessage}); err != nil {
+			return err
+		}
+
+		buf := new(bytes.Buffer)
+		if err := gob.NewEncoder(buf).Encode(msg); err != nil {
+			return err
+		}
+		if err := p.Send(buf.Bytes()); err != nil {
+			log.Printf("Failed to send addresses to peer %s: %v\n", p.RemoteAddr(), err)
+		}
+	}
 
 	return nil
 }
@@ -148,18 +180,16 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 
 	for _, peer := range s.peers {
 		var fileSize int64
-		
+
 		// Set a timeout duration for reading the file size
 		readTimeout := 5 * time.Second
 		done := make(chan error) // Channel to signal completion of read operation
-	
-		
+
 		go func(peer p2p.Peer) {
 			err := binary.Read(peer, binary.LittleEndian, &fileSize)
 			done <- err // Send the result (error or nil) back to the main routine
 		}(peer)
-	
-		
+
 		select {
 		case err := <-done:
 			if err != nil {
@@ -170,14 +200,13 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 			fmt.Printf("Timeout while waiting for file size from peer %s\n", peer.RemoteAddr().String())
 			continue
 		}
-	
-		
+
 		if _, err := s.Storage.StoreFile(key, io.LimitReader(peer, fileSize)); err != nil {
-			return nil, err 
+			return nil, err
 		}
 
 		fmt.Printf("[%s] successfully received and stored file with key (%s) of size %d bytes from peer %s\n", s.Config.Transport.RemoteAddr(), key, fileSize, peer.RemoteAddr().String())
-		
+
 		peer.CloseStream()
 	}
 
@@ -206,9 +235,9 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	message := Message{
 		Payload: StoreFileMessage{
-			Key:  key,
+			Key: key,
 			// Total size includes 16 bytes for the Initialization Vector (IV) at the beginning of the file.
-			Size: 16 + size, 
+			Size: 16 + size,
 		},
 	}
 
@@ -240,6 +269,10 @@ func (s *FileServer) handleMessage(from net.Addr, message Message) error {
 		return s.handleGetFileMessage(from, payloadType)
 	case StoreFileMessage:
 		return s.handleStoreFileMessage(from, payloadType)
+	case PeersInfoMessage:
+		return s.handlePeersInfoMessage(from, payloadType)
+	case NodeIntroductionMessage:
+		return s.handleNodeIntroductionMessage(payloadType)
 	}
 
 	return nil
@@ -308,6 +341,34 @@ func (s *FileServer) handleStoreFileMessage(from net.Addr, message StoreFileMess
 	return nil
 }
 
+// handlePeersInfoMessage handles incoming peer information messages, which contain a list of peer addresses.
+// When a new list of peer addresses is received, the function attempts to establish connections with each address.
+func (s *FileServer) handlePeersInfoMessage(from net.Addr, message PeersInfoMessage) error {
+	fmt.Printf("%s received peer address list %v from %s\n", s.Config.Transport.RemoteAddr(), message.Addresses, from)
+	for _, address := range message.Addresses {
+		if len(address) == 0 {
+			continue
+		}
+
+		go func() {
+			fmt.Printf("%s Attempting to broadcasted node: %s\n", s.Config.Transport.RemoteAddr(), address)
+			if err := s.Config.Transport.Dial(address); err != nil {
+				log.Printf("Failed to connect to broadcasted node %s: %v\n", address, err)
+			}
+		}()
+	}
+
+	return nil
+}
+
+// handleNodeIntroductionMessage processes a NodeIntroductionMessage by adding the
+// address from the message to the server's list of peer addresses.
+func (s *FileServer) handleNodeIntroductionMessage(message NodeIntroductionMessage) error {
+	fmt.Printf("Node %s received introduction message from Node %s\n", s.Config.Transport.RemoteAddr(), message.Address)
+	s.PeersAddresses = append(s.PeersAddresses, message.Address)
+	return nil
+}
+
 // connectToBootstrapNodes attempts to connect to all bootstrap nodes specified in the server's configuration.
 // It iterates over the list of bootstrap node addresses and spawns a goroutine for each non-empty address to
 // establish a connection using the server's transport mechanism. If a connection attempt fails, an error is logged.
@@ -337,6 +398,17 @@ func (s *FileServer) Start() error {
 
 	s.connectToBootstrapNodes()
 
+	time.Sleep(5 * time.Millisecond)
+	// After joining the network, send your address to all other nodes to share your real address
+	message := Message{
+		Payload: NodeIntroductionMessage{
+			Address: s.Config.Transport.RemoteAddr(),
+		},
+	}
+	if err := s.broadcast(&message); err != nil {
+		return err
+	}
+
 	s.loop()
 
 	return nil
@@ -345,4 +417,6 @@ func (s *FileServer) Start() error {
 func init() {
 	gob.Register(StoreFileMessage{})
 	gob.Register(GetFileMessage{})
+	gob.Register(PeersInfoMessage{})
+	gob.Register(NodeIntroductionMessage{})
 }
