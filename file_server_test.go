@@ -12,7 +12,7 @@ import (
 )
 
 // makeServer initializes a FileServer with the specified options.
-func makeServer(listenAddress string, bootstrapNode ...string) *FileServer {
+func makeServer(listenAddress string, isBootstrapNode bool, bootstrapNode ...string) *FileServer {
 	tcptransportOpts := &p2p.TCPTransportOPT{
 		ListenAddress: listenAddress,
 		HandshakeFunc: p2p.NOPHandshakeFunc,
@@ -27,6 +27,7 @@ func makeServer(listenAddress string, bootstrapNode ...string) *FileServer {
 		PathTranformFunc: HashPathBuilder,
 		Transport:        tcpTransport,
 		BootstrapNodes:   bootstrapNode,
+		IsBootstrapNode:  isBootstrapNode,
 	}
 
 	server := NewFileServer(fileServerOpts)
@@ -47,7 +48,7 @@ func generateRandomData(size int) []byte {
 func TestFileServer(t *testing.T) {
 	// Start the initial peer on port 3000
 	initialPeer := "127.0.0.5:3000"
-	server := makeServer(initialPeer)
+	server := makeServer(initialPeer, true)
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Fatalf("Failed to start server on %s: %v", initialPeer, err)
@@ -61,7 +62,7 @@ func TestFileServer(t *testing.T) {
 	servers = append(servers, server) // Include the initial server
 
 	for _, addr := range addresses {
-		s := makeServer(addr, initialPeer)
+		s := makeServer(addr, false, initialPeer)
 		servers = append(servers, s)
 
 		go func(s *FileServer) {
@@ -111,4 +112,71 @@ func TestFileServer(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestMultiHopFileRequest(t *testing.T) {
+	// This test simulates a multi-hop file request in a peer-to-peer network.
+	// NodeA acts as the bootstrap node, while NodeB and NodeC represent other nodes in the network.
+	//
+	// The network configuration is as follows:
+	// - NodeA (Bootstrap Node): 127.0.0.5:3000
+	// - NodeB (Requester Node): 127.0.0.5:5000
+	// - NodeC (File Holder Node): 127.0.0.5:7000
+	//
+	// The test scenario involves the following steps:
+	// 1. NodeC stores a file ("mybigfile") containing some data.
+	// 2. NodeB starts after the file is stored on NodeC, and it only knows NodeA.
+	// 3. NodeA provides NodeB with NodeC's address.
+	// 4. NodeB sends a request to NodeC (via the address provided by NodeA) to retrieve the file.
+	// 5. The test verifies that NodeB can successfully retrieve the file from NodeC.
+
+	initialPeer := "127.0.0.5:3000"
+
+	// Create and start NodeA (the bootstrap node)
+	nodeA := makeServer(initialPeer, true)
+	go func() {
+		if err := nodeA.Start(); err != nil {
+			log.Fatalf("Failed to start server on %s: %v", initialPeer, err)
+		}
+	}()
+	time.Sleep(5 * time.Millisecond)
+
+	// Create and start NodeC (the file holder node)
+	nodeC := makeServer("127.0.0.5:7000", false, initialPeer)
+	go func() {
+		if err := nodeC.Start(); err != nil {
+			log.Fatalf("Failed to start server on 127.0.0.5:7000: %v", err)
+		}
+	}()
+	time.Sleep(5 * time.Millisecond)
+
+	// Create NodeB (the requester node)
+	nodeB := makeServer("127.0.0.5:5000", false, initialPeer)
+
+	// Store a file in NodeC
+	fileName := "mybigfile"
+	data := bytes.NewReader([]byte("some bytes"))
+	if err := nodeC.Store(fileName, data); err != nil {
+		t.Error(err)
+	}
+
+	// Start NodeB after the file has been stored
+	go func() {
+		if err := nodeB.Start(); err != nil {
+			log.Fatalf("Failed to start server on 127.0.0.5:5000: %v", err)
+		}
+	}()
+	time.Sleep(5 * time.Millisecond)
+
+	// Simulate NodeA deleting the file from its storage
+	if err := nodeA.Storage.DeleteFile(fileName); err != nil {
+		t.Error(err)
+	}
+
+	// NodeB requests the file from NodeC via the address provided by NodeA
+	r, err := nodeB.Get(fileName)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(r)
 }
