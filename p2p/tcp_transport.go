@@ -119,6 +119,14 @@ func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.listener.Accept()
 		if err != nil {
+			// Check if the error is due to the listener being closed
+			// if it's stop the for loop.
+			if opErr, ok := err.(*net.OpError); ok && !opErr.Temporary() {
+				fmt.Println("TCP listener closed, stopping accept loop")
+				return
+			}
+
+			// For other errors, log and continue to try accepting connections
 			fmt.Printf("TCP accept error: %s\n", err)
 			continue
 		}
