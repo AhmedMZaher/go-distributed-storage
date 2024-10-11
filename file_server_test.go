@@ -180,3 +180,153 @@ func TestMultiHopFileRequest(t *testing.T) {
 	}
 	fmt.Println(r)
 }
+
+func TestComplexDFSScenario(t *testing.T) {
+	// Create a network of 5 nodes
+	initialPeer := "127.0.0.5:3000"
+	nodes := make([]*FileServer, 5)
+	addresses := []string{
+		initialPeer,
+		"127.0.0.5:9000",
+		"127.0.0.5:5000",
+		"127.0.0.5:6000",
+		"127.0.0.5:7000",
+	}
+
+	// Start all nodes
+	for i, addr := range addresses {
+		if i == 0 {
+			nodes[i] = makeServer(addr, true)
+		} else {
+			nodes[i] = makeServer(addr, false, initialPeer)
+		}
+		go func(node *FileServer) {
+			if err := node.Start(); err != nil {
+				log.Fatalf("Failed to start server on %s: %v", node.Config.Transport.RemoteAddr(), err)
+			}
+		}(nodes[i])
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// Allow time for share addresses
+	time.Sleep(1 * time.Second)
+
+	// Define test files
+	files := map[string]string{
+		"file1.txt": "This is the content of file 1",
+		"file2.txt": "File 2 has different content",
+		"file1119.txt": "some jpg bytes",
+		// "file3.txt": "Yet another file with unique content",
+	}
+
+	// Store files on different nodes
+	for fileName, content := range files {
+		nodeIndex := (len(files) - 1) % len(nodes)
+		err := nodes[nodeIndex].Store(fileName, bytes.NewReader([]byte(content)))
+		if err != nil {
+			t.Errorf("Failed to store %s: %v", fileName, err)
+		}
+		fmt.Printf("Stored %s on Node %d\n", fileName, nodeIndex)
+	}
+
+	// Allow time for replication
+	time.Sleep(1 * time.Second)
+
+	// Verify files are accessible from all nodes
+	for _, node := range nodes {
+		for fileName, expectedContent := range files {
+			r, err := node.Get(fileName)
+			if err != nil {
+				t.Errorf("Node %s failed to get %s: %v", node.Config.Transport.RemoteAddr(), fileName, err)
+				continue
+			}
+			content := make([]byte, len(expectedContent))
+			n, err := r.Read(content)
+			if err != nil && err != io.EOF {
+				t.Errorf("Failed to read content of %s: %v", fileName, err)
+				continue
+			}
+			if n != len(expectedContent) {
+				t.Errorf("Unexpected content length for %s. Got: %d, Want: %d", fileName, n, len(expectedContent))
+				continue
+			}
+			if string(content) != expectedContent {
+				t.Errorf("Unexpected content for %s. Got: %s, Want: %s", fileName, string(content), expectedContent)
+			}
+		}
+	}
+
+	// // Simulate node failure: stop node 2
+	nodes[2].Stop()
+	// Delete node 2 files
+	nodes[2].Storage.Clear()
+	fmt.Println("Node 2 has been stopped")
+
+	// Delete a file from its original node
+	deletedFile := "file2.txt"
+	if err := nodes[1].Storage.DeleteFile(deletedFile); err != nil {
+		t.Errorf("Failed to delete %s: %v", deletedFile, err)
+	}
+	fmt.Printf("%s has been deleted from its original node\n", deletedFile)
+
+	// Verify the file is still accessible from other nodes
+	for i, node := range nodes {
+		if i == 1 || i == 2 { // Skip the node where we deleted the file and the stopped node
+			continue
+		}
+		r, err := node.Get(deletedFile)
+		if err != nil {
+			t.Errorf("Node %s failed to get %s after deletion: %v", node.Config.Transport.RemoteAddr(), deletedFile, err)
+			continue
+		}
+		expectedContent := files[deletedFile]
+		content := make([]byte, len(expectedContent))
+		n, err := r.Read(content)
+		if err != nil && err != io.EOF {
+			t.Errorf("Failed to read content of %s after deletion: %v", deletedFile, err)
+			continue
+		}
+		if n != len(expectedContent) {
+			t.Errorf("Unexpected content length for %s after deletion. Got: %d, Want: %d", deletedFile, n, len(expectedContent))
+			continue
+		}
+		if string(content) != expectedContent {
+			t.Errorf("Unexpected content for %s after deletion. Got: %s, Want: %s", deletedFile, string(content), expectedContent)
+		}
+	}
+
+	// // Restart the failed node
+	nodes[2] = makeServer(addresses[2], false, initialPeer)
+	go func() {
+		if err := nodes[2].Start(); err != nil {
+			log.Fatalf("Failed to restart server on %s: %v", addresses[2], err)
+		}
+	}()
+	time.Sleep(1 * time.Second)
+	fmt.Println("Node 2 has been restarted")
+
+	// // Verify the restarted node can access all files
+	for fileName, expectedContent := range files {
+		r, err := nodes[2].Get(fileName)
+		if err != nil {
+			t.Errorf("Restarted node failed to get %s: %v", fileName, err)
+			continue
+		}
+		content := make([]byte, len(expectedContent))
+		n, err := r.Read(content)
+		if err != nil && err != io.EOF {
+			t.Errorf("Failed to read content of %s from restarted node: %v", fileName, err)
+			continue
+		}
+		if n != len(expectedContent) {
+			t.Errorf("Unexpected content length for %s from restarted node. Got: %d, Want: %d", fileName, n, len(expectedContent))
+			continue
+		}
+		if string(content) != expectedContent {
+			t.Errorf("Unexpected content for %s from restarted node. Got: %s, Want: %s", fileName, string(content), expectedContent)
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	fmt.Println("Complex DFS test completed successfully")
+}
