@@ -178,7 +178,14 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 
 	time.Sleep(5 * time.Millisecond)
 
+	// Define a maximum file size threshold (e.g., 100MB)
+	const maxFileSize = 100 * 1024 * 1024 // 100 MB
+	
 	for _, peer := range s.peers {
+		if peer == nil {
+			fmt.Printf("Skipping nil peer: %s\n", peer)
+			continue
+		}
 		var fileSize int64
 
 		// Set a timeout duration for reading the file size
@@ -194,6 +201,14 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		case err := <-done:
 			if err != nil {
 				fmt.Printf("Error reading file size from peer %s: %v\n", peer.RemoteAddr().String(), err)
+				continue
+			}
+			if fileSize < 0 {
+				fmt.Printf("Received negative file size from peer %s, skipping.\n", peer.RemoteAddr().String())
+				continue
+			}
+			if fileSize > maxFileSize {
+				fmt.Printf("File size (%d bytes) from peer %s exceeds maximum limit of %d bytes, skipping.\n", fileSize, peer.RemoteAddr().String(), maxFileSize)
 				continue
 			}
 		case <-time.After(readTimeout):
